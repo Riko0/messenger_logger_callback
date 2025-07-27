@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "messenger-logger-callback"
+version = "0.1.0"
+authors = [
+  { name="Riko0", email="grigoriyalexeenko@gmail.com" },
+]
+description = "A custom logger and Hugging Face Trainer Callback for sending logs to a remote server with authentication."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "requests>=2.25.1",
+    "transformers>=4.0.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/Riko0/messenger-logger-callback"
+"Bug Tracker" = "https://github.com/Riko0/messenger-logger-callback/issues"
