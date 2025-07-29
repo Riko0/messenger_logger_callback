@@ -35,7 +35,7 @@ pip install messenger-logger-callback
 
 ```Python
 from transformers import Trainer, TrainingArguments
-from messenger_logger.callback import MessengerLoggerCallback # Assuming your file is in messenger_logger/callback.py
+from messenger_logger.callback import MessengerLoggerCallback
 import os
 
 # --- Configure your server URL and optional authentication token ---
