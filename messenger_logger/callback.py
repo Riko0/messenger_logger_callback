@@ -62,7 +62,10 @@ class MessengerLoggerCallback(TrainerCallback):
         """
         # TrainerState is a dataclass, so dataclasses.asdict can convert it directly.
         # This will handle nested dataclasses and basic types correctly.
-        return dataclasses.asdict(state)
+        _state = dataclasses.asdict(state)
+        log_history = _state.get("log_history", [])
+        _state["log_history"] = log_history[:5]
+        return _state
 
     def _send_payload(self, payload: Dict[str, Any], step: Optional[int] = None):
         """Helper method to send a JSON payload to the server with error handling."""
