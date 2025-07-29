@@ -27,12 +27,13 @@ You can install `messenger-logger-callback` using pip:
 
 ```bash
 pip install messenger-logger-callback
+```
 
 ## Usage
 
 ### 1. Basic Integration with Hugging Face Trainer
 
-``
+```Python
 from transformers import Trainer, TrainingArguments
 from messenger_logger.callback import MessengerLoggerCallback # Assuming your file is in messenger_logger/callback.py
 import os
@@ -67,12 +68,12 @@ trainer = Trainer(
     train_dataset=dataset["train"],
     callbacks=[messenger_logger] # Add your custom callback here
 )
-``
+```
 
 ### 2. Sending Custom Logs
 You can send arbitrary data at any point using the send_custom_log method:
 
-``
+```Python
 from messenger_logger.callback import MessengerLoggerCallback
 import os
 
@@ -105,12 +106,12 @@ custom_logger.send_custom_log({
     "temperature_celsius": 85,
     "timestamp": "2023-10-27T10:30:00Z"
 })
-``
+```
 
 ## Configuration
 The MessengerLoggerCallback can be configured using:
 
-``
+```Python
 Constructor Arguments:
 
 server_url (str, optional): The HTTP endpoint to send logs to.
@@ -126,7 +127,7 @@ Environment Variables:
 MESSENGER_LOGGER_SERVER_URL: Overrides server_url if set.
 
 MESSENGER_LOGGER_AUTH_TOKEN: Overrides auth_token if set.
-``
+```
 
 Precedence: Constructor arguments take precedence over environment variables. If neither is provided for server_url, a ValueError will be raised.
 
