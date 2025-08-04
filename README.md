@@ -111,7 +111,8 @@ custom_logger.send_custom_log({
 ```
 
 ## Configuration
-The MessengerLoggerCallback can be configured using a three-tiered precedence system:
+
+### MessengerLoggerCallback can be configured using a three-tiered precedence system:
 
 Constructor Arguments: Take the highest precedence.
 
@@ -119,9 +120,10 @@ Environment Variables: Overridden by constructor arguments.
 
 .env File: Loaded if dotenv_path is provided, and overridden by both environment variables and constructor arguments.
 
-The available arguments and corresponding environment variables are:
+### The available arguments and corresponding environment variables are:
 
 | Constructor Argument | Environment Variable | Description |
+| -----| ----- | ----- |
 | server_url | MESSENGER_LOGGER_SERVER_URL | The HTTP endpoint to send logs to. Required. |
 | project_name | (n/a) | A string identifier for your project. Defaults to "default_project". |
 | run_id | (n/a) | A unique identifier for the current training run. If not provided, a timestamp-based ID is generated. |
@@ -130,7 +132,8 @@ The available arguments and corresponding environment variables are:
 | metadata | MESSENGER_LOGGER_METADATA | A dictionary of static metadata. The environment variable should be a valid JSON string
 | dotenv_path | MESSENGER_LOGGER_DOTENV | Path to a .env file to load variables from. |
 
-Error Handling
+
+## Error Handling
 The library includes robust error handling for network requests. If the logging server is unavailable, times out, or returns an HTTP error (4xx/5xx), a warning or error message will be printed to the console, but your training script will continue to run without interruption.
 
 Example error messages you might see:
