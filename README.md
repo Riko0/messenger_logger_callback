@@ -38,27 +38,28 @@ from transformers import Trainer, TrainingArguments
 from messenger_logger.callback import MessengerLoggerCallback
 import os
 
-# --- Configure your server URL and optional authentication token ---
+# --- Configure your server URL and optional authentication token, username, and metadata ---
 # Option A: Pass directly to the constructor
-SERVER_URL = "[http://your-logging-server.com/api/logs](http://your-logging-server.com/api/logs)"
-AUTH_TOKEN = "your_secret_api_token"
+messenger_logger = MessengerLoggerCallback(
+    server_url="http://your-logging-server.com/api/logs",
+    project_name="my_awesome_model",
+    run_id="experiment_v2",
+    auth_token="your_secret_api_token",
+    author_username="john.doe",
+    metadata={"framework": "pytorch", "model_type": "bert-large"}
+)
 
 # Option B: Set as environment variables (recommended for production)
-# os.environ["MESSENGER_LOGGER_SERVER_URL"] = "[http://your-logging-server.com/api/logs](http://your-logging-server.com/api/logs)"
+# os.environ["MESSENGER_LOGGER_SERVER_URL"] = "http://your-logging-server.com/api/logs"
 # os.environ["MESSENGER_LOGGER_AUTH_TOKEN"] = "your_secret_api_token"
+# os.environ["MESSENGER_LOGGER_AUTHOR_USERNAME"] = "jane.smith"
+# os.environ["MESSENGER_LOGGER_METADATA"] = '{"dataset": "squad", "batch_size": 32}'
 
-# Initialize the callback
-# If using environment variables, you can omit server_url and auth_token arguments:
+# If using environment variables, you can omit the arguments:
 # messenger_logger = MessengerLoggerCallback(
 #     project_name="my_awesome_model",
 #     run_id="experiment_v2"
 # )
-messenger_logger = MessengerLoggerCallback(
-    server_url=SERVER_URL,
-    project_name="my_awesome_model",
-    run_id="experiment_v2",
-    auth_token=AUTH_TOKEN
-)
 
 ...
 
@@ -80,6 +81,7 @@ import os
 # Ensure the logger is initialized (e.g., from environment variables)
 # os.environ["MESSENGER_LOGGER_SERVER_URL"] = "http://localhost:5000/api/logs"
 # os.environ["MESSENGER_LOGGER_AUTH_TOKEN"] = "my_custom_token"
+# os.environ["MESSENGER_LOGGER_AUTHOR_USERNAME"] = "jane.smith"
 custom_logger = MessengerLoggerCallback(
     server_url="http://localhost:5000/api/logs", # Or omit if using env vars
     project_name="my_inference_project",
@@ -109,27 +111,24 @@ custom_logger.send_custom_log({
 ```
 
 ## Configuration
-The MessengerLoggerCallback can be configured using:
+The MessengerLoggerCallback can be configured using a three-tiered precedence system:
 
-```Python
-Constructor Arguments:
+Constructor Arguments: Take the highest precedence.
 
-server_url (str, optional): The HTTP endpoint to send logs to.
+Environment Variables: Overridden by constructor arguments.
 
-project_name (str, optional): A string identifier for your project (defaults to "default_project").
+.env File: Loaded if dotenv_path is provided, and overridden by both environment variables and constructor arguments.
 
-run_id (str, optional): A unique identifier for the current training run. If not provided, a timestamp-based ID is generated.
+The available arguments and corresponding environment variables are:
 
-auth_token (str, optional): An authentication token to include in the Authorization: Bearer <token> header.
-
-Environment Variables:
-
-MESSENGER_LOGGER_SERVER_URL: Overrides server_url if set.
-
-MESSENGER_LOGGER_AUTH_TOKEN: Overrides auth_token if set.
-```
-
-Precedence: Constructor arguments take precedence over environment variables. If neither is provided for server_url, a ValueError will be raised.
+| Constructor Argument | Environment Variable | Description |
+| server_url | MESSENGER_LOGGER_SERVER_URL | The HTTP endpoint to send logs to. Required. |
+| project_name | (n/a) | A string identifier for your project. Defaults to "default_project". |
+| run_id | (n/a) | A unique identifier for the current training run. If not provided, a timestamp-based ID is generated. |
+| auth_token | MESSENGER_LOGGER_AUTH_TOKEN | An authentication token for the Authorization header. |
+| author_username | MESSENGER_LOGGER_AUTHOR_USERNAME | The username of the author. Defaults to "anonymous". |
+| metadata | MESSENGER_LOGGER_METADATA | A dictionary of static metadata. The environment variable should be a valid JSON string
+| dotenv_path | MESSENGER_LOGGER_DOTENV | Path to a .env file to load variables from. |
 
 Error Handling
 The library includes robust error handling for network requests. If the logging server is unavailable, times out, or returns an HTTP error (4xx/5xx), a warning or error message will be printed to the console, but your training script will continue to run without interruption.
