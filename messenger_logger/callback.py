@@ -51,12 +51,12 @@ class MessengerLoggerCallback(TrainerCallback):
 
         # Load environment variables from the specified .env file if a path is provided.
         self.dotenv_path = dotenv_path if dotenv_path else os.getenv("MESSENGER_LOGGER_DOTENV")
-        if dotenv_path:
+        if self.dotenv_path:
             try:
-                dotenv.load_dotenv(dotenv_path=dotenv_path)
-                print(f"Loaded environment variables from {dotenv_path}")
+                dotenv.load_dotenv(dotenv_path=self.dotenv_path)
+                print(f"Loaded environment variables from {self.dotenv_path}")
             except Exception as e:
-                print(f"Warning: Could not load .env file from {dotenv_path}. Error: {e}")
+                print(f"Warning: Could not load .env file from {self.dotenv_path}. Error: {e}")
 
         # Determine server_url: Prioritize direct argument, then env variable.
         self.server_url = server_url if server_url else os.getenv("MESSENGER_LOGGER_SERVER_URL")
