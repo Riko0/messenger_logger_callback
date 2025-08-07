@@ -142,30 +142,34 @@ class MessengerLoggerCallback(TrainerCallback):
         It constructs a payload with the current training state and metrics,
         and sends it to the configured server URL.
         """
-        payload = {
-            "project_name": self.project_name,
-            "run_id": self.run_id,
-            "event_type": "trainer_log",
-            "trainer_state": self._get_trainer_state_info(state),
-            "logs": logs,
-            "timestamp": datetime.datetime.now().isoformat()
-        }
-        self._send_payload(payload, state.global_step)
+        if state.is_world_process_zero:
+            payload = {
+                "project_name": self.project_name,
+                "run_id": self.run_id,
+                "event_type": "trainer_log",
+                "trainer_state": self._get_trainer_state_info(state),
+                "logs": logs,
+                "timestamp": datetime.datetime.now().isoformat()
+            }
+            self._send_payload(payload, state.global_step)
 
     def on_train_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
         """Event called at the beginning of training."""
-        print(f"Training for project '{self.project_name}', run '{self.run_id}' has begun.")
-        self._send_status_update("training_started", state)
+        if state.is_world_process_zero:
+            print(f"Training for project '{self.project_name}', run '{self.run_id}' has begun.")
+            self._send_status_update("training_started", state)
 
     def on_train_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
         """Event called at the end of training."""
-        print(f"Training for project '{self.project_name}', run '{self.run_id}' has ended.")
-        self._send_status_update("training_finished", state)
+        if state.is_world_process_zero:
+            print(f"Training for project '{self.project_name}', run '{self.run_id}' has ended.")
+            self._send_status_update("training_finished", state)
 
     def on_epoch_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
         """Event called at the end of an epoch."""
-        print(f"Epoch {state.epoch} ended for project '{self.project_name}', run '{self.run_id}'.")
-        self._send_status_update("epoch_ended", state)
+        if state.is_world_process_zero:
+            print(f"Epoch {int(state.epoch)} ended for project '{self.project_name}', run '{self.run_id}'.")
+            self._send_status_update("epoch_ended", state)
 
     def _send_status_update(self, event_type: str, state: TrainerState):
         """Helper to send general status updates."""
@@ -183,8 +187,11 @@ class MessengerLoggerCallback(TrainerCallback):
         Sends arbitrary custom data to the remote server.
 
         This method can be called directly by the user at any point in their
-        training script or other parts of their application to send specific
-        information that is not part of the standard Trainer logs.
+        training script.
+
+        Note: In a distributed training environment (e.g., with multiple GPUs),
+        be mindful to call this method only from the main process to avoid
+        sending duplicate logs. You can check `trainer.state.is_world_process_zero`.
 
         Args:
             custom_data (Dict[str, Any]): A dictionary containing the custom data
@@ -226,6 +233,7 @@ if __name__ == "__main__":
         dummy_state.global_step = 10
         dummy_state.epoch = 0.1
         dummy_state.is_training = True
+        dummy_state.is_world_process_zero = True # Simulate main process
         dummy_control = TrainerControl()
         dummy_logs = {"loss": 0.1234}
         my_logger_direct.on_log(dummy_args, dummy_state, dummy_control, dummy_logs)
@@ -253,6 +261,7 @@ if __name__ == "__main__":
         dummy_state_env.global_step = 20
         dummy_state_env.epoch = 0.2
         dummy_state_env.is_training = True
+        dummy_state_env.is_world_process_zero = True # Simulate main process
         dummy_control_env = TrainerControl()
         dummy_logs_env = {"loss": 0.5678, "learning_rate": 5e-5}
         my_logger_env.on_log(dummy_args_env, dummy_state_env, dummy_control_env, dummy_logs_env)
@@ -291,6 +300,7 @@ if __name__ == "__main__":
         dummy_state_dotenv.global_step = 40
         dummy_state_dotenv.epoch = 0.4
         dummy_state_dotenv.is_training = True
+        dummy_state_dotenv.is_world_process_zero = True # Simulate main process
         dummy_control_dotenv = TrainerControl()
         dummy_logs_dotenv = {"loss": 0.3333}
         my_logger_dotenv.on_log(dummy_args_dotenv, dummy_state_dotenv, dummy_control_dotenv, dummy_logs_dotenv)
@@ -317,6 +327,7 @@ if __name__ == "__main__":
         dummy_state_un.global_step = 50
         dummy_state_un.epoch = 0.5
         dummy_state_un.is_training = True
+        dummy_state_un.is_world_process_zero = True # Simulate main process
         dummy_control_un = TrainerControl()
         dummy_logs_un = {"loss": 0.999}
         my_logger_unavailable.on_log(dummy_args_un, dummy_state_un, dummy_control_un, dummy_logs_un)
