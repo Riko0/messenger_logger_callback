@@ -25,7 +25,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools
           pip install pytest
-          pip install .[trainer]
+          pip install .
         timeout-minutes: 10
 
       - name: Run tests
