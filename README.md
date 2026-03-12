@@ -1,18 +1,26 @@
-# Messenger Logger Callback
+# messenger-logger-callback
 
-A Python library for sending training logs to a remote server. Works as a **standalone logger** for any training loop or as a **Hugging Face Trainer Callback**.
+[![PyPI version](https://img.shields.io/pypi/v/messenger-logger-callback.svg)](https://pypi.org/project/messenger-logger-callback/)
+[![Python](https://img.shields.io/pypi/pyversions/messenger-logger-callback.svg)](https://pypi.org/project/messenger-logger-callback/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-Pairs with [telegram-log-service](https://github.com/Riko0/telegram_log_service) for real-time Telegram alerts.
+**messenger-logger-callback** (`messenger_logger_callback`) — a Python library for sending training logs to a remote server with real-time **Telegram** notifications. Works as a **standalone logger** for any training loop (PyTorch, Lightning, custom) or as a **Hugging Face Trainer Callback**.
+
+Pairs with [telegram-log-service](https://github.com/Riko0/telegram_log_service) for real-time Telegram bot alerts, metric monitoring, and stalled run detection.
 
 ## Installation
 
 ```bash
-# Standalone (no transformers dependency)
 pip install messenger-logger-callback
-
-# With Hugging Face Trainer support
-pip install messenger-logger-callback[trainer]
 ```
+
+Or equivalently:
+
+```bash
+pip install messenger_logger_callback
+```
+
+This installs everything including Hugging Face Transformers Trainer support. If you only need the standalone logger and want to avoid the `transformers` dependency, install with `--no-deps` and add `requests` and `python-dotenv` manually.
 
 ## Quick Start: Standalone Logger
 
@@ -135,6 +143,14 @@ Error: Could not connect to server at http://... for step 20.
 Error: HTTP error occurred while sending logs for step 30. Status: 401.
 ```
 
+## Related Projects
+
+- **[telegram-log-service](https://github.com/Riko0/telegram_log_service)** — the server that receives logs from this library and forwards them as Telegram bot alerts.
+
 ## License
 
 MIT
+
+---
+
+<sub>messenger-logger-callback · messenger_logger_callback · pip install messenger-logger-callback · pip install messenger_logger_callback · Telegram training logger · Hugging Face Trainer callback logger · ML training Telegram notifications</sub>
