@@ -2,6 +2,8 @@
 
 A Python library for sending training logs to a remote server. Works as a **standalone logger** for any training loop or as a **Hugging Face Trainer Callback**.
 
+Pairs with [telegram-log-service](https://github.com/Riko0/telegram_log_service) for real-time Telegram alerts.
+
 ## Installation
 
 ```bash
