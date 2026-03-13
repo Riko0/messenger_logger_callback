@@ -135,22 +135,25 @@ class LoggerEngine:
             task = Task.current_task()
             if task:
                 print(f"[MessengerLogger] ClearML task found: id={task.id}")
-                url = task.get_task_url()
+                # Try the API method first, fall back to building URL manually
+                url = None
+                for method_name in ("get_task_url", "get_output_log_web_page"):
+                    method = getattr(task, method_name, None)
+                    if method:
+                        try:
+                            url = method()
+                            if url:
+                                break
+                        except Exception:
+                            pass
                 if url:
                     print(f"[MessengerLogger] ClearML URL: {url}")
                     return url
-                # get_task_url() returned empty — build URL manually
-                web_host = os.getenv("CLEARML_WEB_HOST", "").rstrip("/")
-                if not web_host:
-                    api_host = os.getenv("CLEARML_API_HOST", "")
-                    if api_host:
-                        web_host = api_host.replace("://api.", "://app.")
-                if web_host:
-                    project_id = task.get_project_name() or "*"
-                    url = f"{web_host}/projects/*/experiments/{task.id}/output/log"
-                    print(f"[MessengerLogger] ClearML URL (built from env): {url}")
+                # Build URL manually from task.id + env vars
+                url = self._build_clearml_url(task.id)
+                if url:
                     return url
-                print(f"[MessengerLogger] ClearML task found but could not build URL")
+                print("[MessengerLogger] ClearML task found but could not build URL")
             else:
                 print("[MessengerLogger] ClearML imported but Task.current_task() is None")
         except ImportError:
@@ -163,25 +166,23 @@ class LoggerEngine:
         task_id = os.getenv("CLEARML_TASK_ID")
         if task_id:
             print(f"[MessengerLogger] Found CLEARML_TASK_ID={task_id}")
+            url = self._build_clearml_url(task_id)
+            if url:
+                return url
+
+        return None
+
+    def _build_clearml_url(self, task_id: str) -> Optional[str]:
+        """Build a ClearML web UI URL from task ID and env vars."""
+        web_host = os.getenv("CLEARML_WEB_HOST", "").rstrip("/")
+        if not web_host:
             api_host = os.getenv("CLEARML_API_HOST", "")
             if api_host:
                 web_host = api_host.replace("://api.", "://app.").rstrip("/")
-            else:
-                web_host = os.getenv("CLEARML_WEB_HOST", "").rstrip("/")
-            if web_host:
-                url = f"{web_host}/projects/*/experiments/{task_id}/output/log"
-                print(f"[MessengerLogger] ClearML URL (from env): {url}")
-                return url
-            try:
-                from clearml import Task
-                task = Task.get_task(task_id=task_id)
-                if task:
-                    url = task.get_task_url()
-                    if url:
-                        return url
-            except Exception as e:
-                print(f"[MessengerLogger] ClearML get_task error: {e}")
-
+        if web_host:
+            url = f"{web_host}/projects/*/experiments/{task_id}/output/log"
+            print(f"[MessengerLogger] ClearML URL (built from env): {url}")
+            return url
         return None
 
     def _ensure_clearml_link(self):
