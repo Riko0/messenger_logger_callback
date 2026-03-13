@@ -10,12 +10,14 @@ class MessengerLoggerCallback(TrainerCallback):
     """
     Hugging Face Trainer Callback that sends training events to a remote server.
 
-    Intercepts Trainer lifecycle events (log, train begin/end, epoch end) and
-    forwards them via HTTP. Also provides send_custom_log for arbitrary data.
+    Safe by design — if the server is unreachable or the URL is not configured,
+    all methods silently do nothing. The callback will never raise an exception
+    or interfere with training.
 
     Args:
         server_url: The URL of the server endpoint. Falls back to
-            MESSENGER_LOGGER_SERVER_URL env var.
+            MESSENGER_LOGGER_SERVER_URL env var. If neither is set the
+            callback becomes a no-op.
         project_name: Identifier for the training project.
         run_id: Unique identifier for this run. Auto-generated if omitted.
         auth_token: Bearer token for the Authorization header. Falls back to
@@ -52,11 +54,11 @@ class MessengerLoggerCallback(TrainerCallback):
 
     @property
     def project_name(self) -> str:
-        return self._engine.project_name
+        return getattr(self._engine, "project_name", "default_project")
 
     @property
     def run_id(self) -> str:
-        return self._engine.run_id
+        return getattr(self._engine, "run_id", "")
 
     def _get_trainer_state_info(self, state: TrainerState) -> Dict[str, Any]:
         """Extract trainer state as a plain dict, trimming log_history."""
@@ -73,19 +75,11 @@ class MessengerLoggerCallback(TrainerCallback):
         **kwargs,
     ):
         if state.is_world_process_zero:
-            if not self._engine.clearml_link:
-                self._engine.clearml_link = self._engine._detect_clearml_link()
-                if self._engine.clearml_link:
-                    print(f"ClearML task detected: {self._engine.clearml_link}")
             self._engine.send_event(
                 "training_started",
                 trainer_state=self._get_trainer_state_info(state),
             )
             self._engine.start_heartbeat()
-            print(
-                f"Training for project '{self.project_name}', "
-                f"run '{self.run_id}' has begun."
-            )
 
     def on_train_end(
         self,
@@ -99,10 +93,6 @@ class MessengerLoggerCallback(TrainerCallback):
             self._engine.send_event(
                 "training_finished",
                 trainer_state=self._get_trainer_state_info(state),
-            )
-            print(
-                f"Training for project '{self.project_name}', "
-                f"run '{self.run_id}' has ended."
             )
 
     def on_log(
@@ -132,10 +122,6 @@ class MessengerLoggerCallback(TrainerCallback):
                 "epoch_ended",
                 trainer_state=self._get_trainer_state_info(state),
             )
-            print(
-                f"Epoch {int(state.epoch)} ended for project "
-                f"'{self.project_name}', run '{self.run_id}'."
-            )
 
     def send_custom_log(self, custom_data: Dict[str, Any]):
         """
@@ -145,10 +131,5 @@ class MessengerLoggerCallback(TrainerCallback):
         (check trainer.state.is_world_process_zero).
         """
         if not isinstance(custom_data, dict):
-            print("Error: custom_data must be a dictionary.")
             return
         self._engine.send_event("custom_log", custom_data=custom_data)
-        print(
-            f"Sending custom log for project '{self.project_name}', "
-            f"run '{self.run_id}'."
-        )
