@@ -134,24 +134,44 @@ class LoggerEngine:
             from clearml import Task
             task = Task.current_task()
             if task:
+                print(f"[MessengerLogger] ClearML task found: id={task.id}")
                 url = task.get_task_url()
                 if url:
+                    print(f"[MessengerLogger] ClearML URL: {url}")
                     return url
+                # get_task_url() returned empty — build URL manually
+                web_host = os.getenv("CLEARML_WEB_HOST", "").rstrip("/")
+                if not web_host:
+                    api_host = os.getenv("CLEARML_API_HOST", "")
+                    if api_host:
+                        web_host = api_host.replace("://api.", "://app.")
+                if web_host:
+                    project_id = task.get_project_name() or "*"
+                    url = f"{web_host}/projects/*/experiments/{task.id}/output/log"
+                    print(f"[MessengerLogger] ClearML URL (built from env): {url}")
+                    return url
+                print(f"[MessengerLogger] ClearML task found but could not build URL")
+            else:
+                print("[MessengerLogger] ClearML imported but Task.current_task() is None")
         except ImportError:
+            print("[MessengerLogger] ClearML not installed")
             return None
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[MessengerLogger] ClearML detection error: {e}")
 
         # 2. Try building the URL from CLEARML_TASK_ID env var
         task_id = os.getenv("CLEARML_TASK_ID")
         if task_id:
+            print(f"[MessengerLogger] Found CLEARML_TASK_ID={task_id}")
             api_host = os.getenv("CLEARML_API_HOST", "")
             if api_host:
                 web_host = api_host.replace("://api.", "://app.").rstrip("/")
             else:
                 web_host = os.getenv("CLEARML_WEB_HOST", "").rstrip("/")
             if web_host:
-                return f"{web_host}/projects/*/experiments/{task_id}/output/log"
+                url = f"{web_host}/projects/*/experiments/{task_id}/output/log"
+                print(f"[MessengerLogger] ClearML URL (from env): {url}")
+                return url
             try:
                 from clearml import Task
                 task = Task.get_task(task_id=task_id)
@@ -159,8 +179,8 @@ class LoggerEngine:
                     url = task.get_task_url()
                     if url:
                         return url
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[MessengerLogger] ClearML get_task error: {e}")
 
         return None
 
