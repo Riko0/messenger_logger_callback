@@ -1,9 +1,6 @@
-"""Test the standalone MessengerLogger against an unreachable server.
+"""Test the standalone MessengerLogger — safety, no-op modes, and payloads."""
 
-Every method must complete without raising, printing connection errors
-to stdout instead of crashing the training process.
-"""
-
+import os
 import unittest
 from unittest import mock
 
@@ -26,6 +23,7 @@ class TestStandaloneLogger(unittest.TestCase):
     def test_properties(self):
         self.assertEqual(self.logger.project_name, "test_project")
         self.assertEqual(self.logger.run_id, "test_run")
+        self.assertTrue(self.logger.active)
 
     def test_start_does_not_crash(self):
         self.logger.start()
@@ -57,7 +55,6 @@ class TestStandaloneLogger(unittest.TestCase):
         self.logger.finish()
 
     def test_send_event_payload(self):
-        """Verify the payload structure passed to _send_payload."""
         with mock.patch.object(self.logger._engine, "_send_payload") as m:
             self.logger.start()
             call_args = m.call_args[0][0]
@@ -75,6 +72,38 @@ class TestStandaloneLogger(unittest.TestCase):
             self.assertEqual(call_args["logs"], {"loss": 0.3, "lr": 1e-4})
             self.assertEqual(call_args["trainer_state"]["global_step"], 5)
             self.assertEqual(call_args["trainer_state"]["epoch"], 1.0)
+
+
+class TestStandaloneLoggerNoop(unittest.TestCase):
+    """Logger must be a safe no-op when server_url is missing or rank != 0."""
+
+    def test_noop_when_no_server_url(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            lgr = MessengerLogger(project_name="p", heartbeat_interval=None)
+            self.assertFalse(lgr.active)
+            lgr.start()
+            lgr.log(step=1, metrics={"loss": 0.5})
+            lgr.finish()
+
+    def test_noop_when_rank_nonzero(self):
+        lgr = MessengerLogger(
+            server_url=UNREACHABLE, rank=1, heartbeat_interval=None,
+        )
+        self.assertFalse(lgr.active)
+        lgr.start()
+        lgr.log(step=1, metrics={"loss": 0.5})
+        lgr.finish()
+
+    def test_active_when_rank_zero(self):
+        lgr = MessengerLogger(
+            server_url=UNREACHABLE, rank=0, heartbeat_interval=None,
+        )
+        self.assertTrue(lgr.active)
+
+    def test_noop_properties_safe(self):
+        lgr = MessengerLogger(rank=7, heartbeat_interval=None)
+        self.assertEqual(lgr.project_name, "default_project")
+        self.assertEqual(lgr.run_id, "")
 
 
 if __name__ == "__main__":

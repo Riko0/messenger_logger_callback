@@ -3,8 +3,22 @@ import json
 import os
 import datetime
 import threading
+import traceback
 import dotenv
 from typing import Dict, Any, Optional
+
+
+def _safe(method):
+    """Decorator that swallows all exceptions so the logger never crashes training."""
+    def wrapper(self, *args, **kwargs):
+        if not self._active:
+            return
+        try:
+            return method(self, *args, **kwargs)
+        except Exception:
+            traceback.print_exc()
+            print(f"Warning: MessengerLogger.{method.__name__}() failed (see above). Training continues.")
+    return wrapper
 
 
 class LoggerEngine:
@@ -14,6 +28,10 @@ class LoggerEngine:
     Handles configuration resolution, HTTP transport, ClearML auto-detection,
     heartbeat background thread, and payload construction. Used internally by
     both MessengerLogger (standalone) and MessengerLoggerCallback (HF Trainer).
+
+    If ``server_url`` is not provided (and not in env), the engine becomes a
+    silent no-op — no exceptions, no network calls. Same when ``rank`` is set
+    to any value other than 0.
     """
 
     def __init__(
@@ -26,9 +44,25 @@ class LoggerEngine:
         metadata: Optional[Dict[str, Any]] = None,
         dotenv_path: Optional[str] = None,
         heartbeat_interval: Optional[int] = 60,
+        rank: Optional[int] = None,
     ):
-        self._load_dotenv(dotenv_path)
-        self.server_url = self._resolve_server_url(server_url)
+        self._active = False
+        self._heartbeat_stop: Optional[threading.Event] = None
+        self._heartbeat_thread: Optional[threading.Thread] = None
+
+        if rank is not None and rank != 0:
+            return
+
+        try:
+            self._load_dotenv(dotenv_path)
+            self.server_url = self._resolve_server_url(server_url)
+        except Exception:
+            return
+
+        if not self.server_url:
+            return
+
+        self._active = True
         self.auth_token = self._resolve_auth_token(auth_token)
         self.author_username = self._resolve_author_username(author_username)
         self.metadata = self._resolve_metadata(metadata)
@@ -36,10 +70,8 @@ class LoggerEngine:
         self.run_id = run_id or f"run_{int(datetime.datetime.now().timestamp())}"
         self.heartbeat_interval = heartbeat_interval
 
-        self.clearml_link = self._detect_clearml_link()
-
-        self._heartbeat_stop: Optional[threading.Event] = None
-        self._heartbeat_thread: Optional[threading.Thread] = None
+        self.clearml_link: Optional[str] = self._detect_clearml_link()
+        self._clearml_checked_at_start = False
 
         print(
             f"LoggerEngine initialized for project '{self.project_name}', "
@@ -62,12 +94,12 @@ class LoggerEngine:
             except Exception as e:
                 print(f"Warning: Could not load .env file from {self.dotenv_path}. Error: {e}")
 
-    def _resolve_server_url(self, server_url: Optional[str]) -> str:
+    def _resolve_server_url(self, server_url: Optional[str]) -> Optional[str]:
         url = server_url or os.getenv("MESSENGER_LOGGER_SERVER_URL")
         if not url:
-            raise ValueError(
-                "server_url must be provided either as an argument, via an environment "
-                "variable, or within a loaded .env file."
+            print(
+                "MessengerLogger: server_url not provided and MESSENGER_LOGGER_SERVER_URL "
+                "not set. Logger will be inactive (no-op)."
             )
         return url
 
@@ -94,7 +126,7 @@ class LoggerEngine:
                 print(f"Unexpected error processing metadata from env variable: {e}")
         return result
 
-    # --- ClearML detection ---
+    # --- ClearML detection (lazy — retries until found) ---
 
     def _detect_clearml_link(self) -> Optional[str]:
         try:
@@ -108,8 +140,18 @@ class LoggerEngine:
             pass
         return None
 
+    def _ensure_clearml_link(self):
+        """Re-check ClearML if not found yet. Called lazily on send_event."""
+        if self.clearml_link is not None:
+            return
+        link = self._detect_clearml_link()
+        if link:
+            self.clearml_link = link
+            print(f"ClearML task detected (lazy): {self.clearml_link}")
+
     # --- HTTP transport ---
 
+    @_safe
     def send_event(
         self,
         event_type: str,
@@ -118,6 +160,8 @@ class LoggerEngine:
         custom_data: Optional[Dict[str, Any]] = None,
     ):
         """Construct a full payload envelope and send it to the server."""
+        self._ensure_clearml_link()
+
         payload = {
             "project_name": self.project_name,
             "run_id": self.run_id,
@@ -180,6 +224,7 @@ class LoggerEngine:
 
     # --- Heartbeat ---
 
+    @_safe
     def start_heartbeat(self):
         """Start a daemon thread that sends heartbeat events at a fixed interval."""
         if not self.heartbeat_interval:
@@ -195,6 +240,7 @@ class LoggerEngine:
         while not self._heartbeat_stop.wait(self.heartbeat_interval):
             self.send_event("heartbeat")
 
+    @_safe
     def stop_heartbeat(self):
         """Stop the heartbeat background thread."""
         if self._heartbeat_stop is not None:

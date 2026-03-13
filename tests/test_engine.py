@@ -1,4 +1,4 @@
-"""Test LoggerEngine configuration and payload construction."""
+"""Test LoggerEngine configuration, payload construction, and safety."""
 
 import os
 import unittest
@@ -13,17 +13,26 @@ UNREACHABLE = "http://localhost:19999/api/logs"
 class TestEngineConfig(unittest.TestCase):
     def test_server_url_from_arg(self):
         engine = LoggerEngine(server_url=UNREACHABLE, heartbeat_interval=None)
+        self.assertTrue(engine._active)
         self.assertEqual(engine.server_url, UNREACHABLE)
 
     def test_server_url_from_env(self):
         with mock.patch.dict(os.environ, {"MESSENGER_LOGGER_SERVER_URL": UNREACHABLE}):
             engine = LoggerEngine(heartbeat_interval=None)
+            self.assertTrue(engine._active)
             self.assertEqual(engine.server_url, UNREACHABLE)
 
-    def test_missing_server_url_raises(self):
+    def test_missing_server_url_becomes_noop(self):
         with mock.patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(ValueError):
-                LoggerEngine(heartbeat_interval=None)
+            engine = LoggerEngine(heartbeat_interval=None)
+            self.assertFalse(engine._active)
+
+    def test_noop_engine_methods_are_safe(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            engine = LoggerEngine(heartbeat_interval=None)
+            engine.send_event("test")
+            engine.start_heartbeat()
+            engine.stop_heartbeat()
 
     def test_auth_token_from_arg(self):
         engine = LoggerEngine(
@@ -76,6 +85,26 @@ class TestEngineConfig(unittest.TestCase):
             )
             self.assertIn("arg_key", engine.metadata)
             self.assertIn("env_key", engine.metadata)
+
+
+class TestEngineRank(unittest.TestCase):
+    def test_rank_zero_is_active(self):
+        engine = LoggerEngine(server_url=UNREACHABLE, rank=0, heartbeat_interval=None)
+        self.assertTrue(engine._active)
+
+    def test_rank_none_is_active(self):
+        engine = LoggerEngine(server_url=UNREACHABLE, rank=None, heartbeat_interval=None)
+        self.assertTrue(engine._active)
+
+    def test_rank_nonzero_is_noop(self):
+        engine = LoggerEngine(server_url=UNREACHABLE, rank=1, heartbeat_interval=None)
+        self.assertFalse(engine._active)
+
+    def test_rank_nonzero_methods_are_safe(self):
+        engine = LoggerEngine(server_url=UNREACHABLE, rank=3, heartbeat_interval=None)
+        engine.send_event("test", logs={"loss": 0.1})
+        engine.start_heartbeat()
+        engine.stop_heartbeat()
 
 
 class TestEnginePayload(unittest.TestCase):
@@ -136,6 +165,19 @@ class TestEnginePayload(unittest.TestCase):
             self.engine.send_event("trainer_log")
             payload = m.call_args[0][0]
             self.assertNotIn("clearml_link", payload)
+
+
+class TestEngineSafety(unittest.TestCase):
+    """send_event must never raise, even if the server explodes."""
+
+    def test_connection_error_swallowed(self):
+        engine = LoggerEngine(server_url=UNREACHABLE, heartbeat_interval=None)
+        engine.send_event("trainer_log", logs={"loss": 0.5})
+
+    def test_send_event_exception_swallowed(self):
+        engine = LoggerEngine(server_url=UNREACHABLE, heartbeat_interval=None)
+        with mock.patch.object(engine, "_send_payload", side_effect=RuntimeError("boom")):
+            engine.send_event("trainer_log")
 
 
 if __name__ == "__main__":
