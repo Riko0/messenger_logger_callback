@@ -30,6 +30,9 @@ class MessengerLogger:
             Set to None or 0 to disable.
         rank: Distributed training rank. If set to anything other than 0
             (or None), the logger becomes a silent no-op.
+        clearml_link: Explicit ClearML task URL. If not provided, the
+            logger attempts auto-detection via Task.current_task() and
+            CLEARML_TASK_ID env var.
     """
 
     def __init__(
@@ -43,6 +46,7 @@ class MessengerLogger:
         dotenv_path: Optional[str] = None,
         heartbeat_interval: Optional[int] = 60,
         rank: Optional[int] = None,
+        clearml_link: Optional[str] = None,
     ):
         self._engine = LoggerEngine(
             server_url=server_url,
@@ -54,6 +58,7 @@ class MessengerLogger:
             dotenv_path=dotenv_path,
             heartbeat_interval=heartbeat_interval,
             rank=rank,
+            clearml_link=clearml_link,
         )
         self._state: Dict[str, Any] = {
             "global_step": 0,

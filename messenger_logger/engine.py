@@ -45,6 +45,7 @@ class LoggerEngine:
         dotenv_path: Optional[str] = None,
         heartbeat_interval: Optional[int] = 60,
         rank: Optional[int] = None,
+        clearml_link: Optional[str] = None,
     ):
         self._active = False
         self._heartbeat_stop: Optional[threading.Event] = None
@@ -70,8 +71,7 @@ class LoggerEngine:
         self.run_id = run_id or f"run_{int(datetime.datetime.now().timestamp())}"
         self.heartbeat_interval = heartbeat_interval
 
-        self.clearml_link: Optional[str] = self._detect_clearml_link()
-        self._clearml_checked_at_start = False
+        self.clearml_link: Optional[str] = clearml_link or self._detect_clearml_link()
 
         print(
             f"LoggerEngine initialized for project '{self.project_name}', "
@@ -129,15 +129,39 @@ class LoggerEngine:
     # --- ClearML detection (lazy — retries until found) ---
 
     def _detect_clearml_link(self) -> Optional[str]:
+        # 1. Try Task.current_task() (works if Task.init() was called in this process)
         try:
             from clearml import Task
             task = Task.current_task()
             if task:
-                return task.get_task_url()
+                url = task.get_task_url()
+                if url:
+                    return url
         except ImportError:
-            pass
+            return None
         except Exception:
             pass
+
+        # 2. Try building the URL from CLEARML_TASK_ID env var
+        task_id = os.getenv("CLEARML_TASK_ID")
+        if task_id:
+            api_host = os.getenv("CLEARML_API_HOST", "")
+            if api_host:
+                web_host = api_host.replace("://api.", "://app.").rstrip("/")
+            else:
+                web_host = os.getenv("CLEARML_WEB_HOST", "").rstrip("/")
+            if web_host:
+                return f"{web_host}/projects/*/experiments/{task_id}/output/log"
+            try:
+                from clearml import Task
+                task = Task.get_task(task_id=task_id)
+                if task:
+                    url = task.get_task_url()
+                    if url:
+                        return url
+            except Exception:
+                pass
+
         return None
 
     def _ensure_clearml_link(self):

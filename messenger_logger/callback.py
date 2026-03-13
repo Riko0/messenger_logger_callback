@@ -28,6 +28,9 @@ class MessengerLoggerCallback(TrainerCallback):
         dotenv_path: Path to a .env file to load config from.
         heartbeat_interval: Seconds between heartbeat pings (default 60).
             Set to None or 0 to disable.
+        clearml_link: Explicit ClearML task URL. If not provided, the
+            logger attempts auto-detection via Task.current_task() and
+            CLEARML_TASK_ID env var.
     """
 
     def __init__(
@@ -40,6 +43,7 @@ class MessengerLoggerCallback(TrainerCallback):
         metadata: Optional[Dict[str, Any]] = None,
         dotenv_path: Optional[str] = None,
         heartbeat_interval: Optional[int] = 60,
+        clearml_link: Optional[str] = None,
     ):
         self._engine = LoggerEngine(
             server_url=server_url,
@@ -50,6 +54,7 @@ class MessengerLoggerCallback(TrainerCallback):
             metadata=metadata,
             dotenv_path=dotenv_path,
             heartbeat_interval=heartbeat_interval,
+            clearml_link=clearml_link,
         )
 
     @property
